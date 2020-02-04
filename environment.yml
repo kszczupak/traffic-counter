@@ -1,0 +1,5 @@
+name: traffic-counter
+channels:
+  - defaults
+prefix: /home/krzysiek/anaconda3/envs/traffic-counter
+
