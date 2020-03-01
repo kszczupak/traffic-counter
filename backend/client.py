@@ -86,7 +86,7 @@ def raw_segment_paths():
     while True:
         for i in range(10):
             segment_name = f"raw_{i}.h264"
-            yield config['video_segments']['path']/segment_name
+            yield str(config['video_segments']['path']/segment_name)
 
 
 def send_file_to_socket(file_name, target_socket):
