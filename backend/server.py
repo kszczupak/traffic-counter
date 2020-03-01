@@ -15,6 +15,7 @@ def start_server():
             while True:
                 segment_file_path = config['video_segments']['path']/f"raw_{segment_idx}.h264"
                 fetch_file_from_socket(client, segment_file_path)
+                segment_idx += 1
 
             client.shutdown(socket.SHUT_RDWR)
 
