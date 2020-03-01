@@ -35,7 +35,9 @@ def send_segments_to_server(segments_queue: Queue):
 
     with socket.socket() as s:
         wait_for_connection_with_server(s)
-        segments_queue.put("START_CAPTURING_SEGMENTS")
+        segments_queue.put("CONNECTION_ESTABLISHED")
+        wait_for_message(segments_queue, "CAMERA_INITIALIZED")
+
         while True:
             segment = segments_queue.get()
             if segment == "FINISH":
@@ -46,15 +48,22 @@ def send_segments_to_server(segments_queue: Queue):
         s.shutdown(socket.SHUT_RDWR)
 
 
-def capture_raw_video_segment(segments_queue: Queue):
-    def wait_for_sending_thread():
-        while True:
-            sending_thread_message = segments_queue.get()
-            if sending_thread_message == "START_CAPTURING_SEGMENTS":
-                break
+def wait_for_message(queue: Queue, message):
+    """
+    Waits until given message will appear at the front of the queue.
+    This is a blocking operation.
+    """
+    while True:
+        current_message = queue.get()
+        if current_message == message:
+            break
 
-    wait_for_sending_thread()
+
+def capture_raw_video_segment(segments_queue: Queue):
+    wait_for_message(segments_queue, "CONNECTION_ESTABLISHED")
     camera = picamera.PiCamera(resolution=(1280, 720))
+    segments_queue.put("CAMERA_INITIALIZED")
+
     segment_paths = raw_segment_paths()
     first_segment_path = next(segment_paths)
     camera.start_recording(first_segment_path)

@@ -26,7 +26,7 @@ def fetch_file_from_socket(client_socket, file_path, chunk_size=8*1024):
     - # of bytes defined in header - actual file data
     """
     with open(file_path, "wb") as file:
-        file_size_frame = client.recv(15)
+        file_size_frame = client_socket.recv(15)
         file_size = int(file_size_frame.decode())
         remaining_bytes = file_size
         receiving_file = True
