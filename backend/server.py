@@ -4,10 +4,12 @@ from config import config
 
 
 def start_server():
+    print("Waiting for connection with pi-camera (client)...")
     with socket.socket() as server:
         server.bind(config['server_address'])
         server.listen(1)
         client, _ = server.accept()
+        print("Connection established, serving...")
         with client:
             segment_idx = 0
             while True:

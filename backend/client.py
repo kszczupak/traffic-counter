@@ -21,8 +21,20 @@ def capture_and_send_segments_to_server():
 
 
 def send_segments_to_server(segments_queue: Queue):
+    def wait_for_connection_with_server(client_socket):
+        print(f"Waiting for connection with: {config['server_address']}")
+        connected = False
+        while not connected:
+            try:
+                client_socket.connect(config['server_address'])
+                connected = True
+            except ConnectionRefusedError:
+                sleep(0.5)
+                
+        print("Connected to server")
+
     with socket.socket() as s:
-        s.connect(config['server_address'])
+        wait_for_connection_with_server(s)
         while True:
             segment = segments_queue.get()
             if segment == "FINISH":
