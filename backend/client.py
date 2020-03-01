@@ -30,11 +30,12 @@ def send_segments_to_server(segments_queue: Queue):
                 connected = True
             except ConnectionRefusedError:
                 sleep(0.5)
-                
+
         print("Connected to server")
 
     with socket.socket() as s:
         wait_for_connection_with_server(s)
+        segments_queue.put("START_CAPTURING_SEGMENTS")
         while True:
             segment = segments_queue.get()
             if segment == "FINISH":
@@ -46,6 +47,13 @@ def send_segments_to_server(segments_queue: Queue):
 
 
 def capture_raw_video_segment(segments_queue: Queue):
+    def wait_for_sending_thread():
+        while True:
+            sending_thread_message = segments_queue.get()
+            if sending_thread_message == "START_CAPTURING_SEGMENTS":
+                break
+
+    wait_for_sending_thread()
     camera = picamera.PiCamera(resolution=(1280, 720))
     segment_paths = raw_segment_paths()
     first_segment_path = next(segment_paths)
