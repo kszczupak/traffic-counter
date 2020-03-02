@@ -2,7 +2,7 @@ import socket
 from time import time, sleep
 from pathlib import Path
 from queue import Queue
-from threading import Thread
+from threading import Thread, Event
 
 import picamera
 
@@ -11,16 +11,19 @@ from config import config, project_root
 
 def capture_and_send_segments_to_server():
     segments_queue = Queue()
-    capturing_thread = Thread(target=capture_raw_video_segment, args=(segments_queue,))
-    sending_thread = Thread(target=send_segments_to_server, args=(segments_queue,))
+    stop_event = Event()
+    capturing_thread = Thread(target=capture_raw_video_segment, args=(segments_queue, stop_event), daemon=True)
+    sending_thread = Thread(target=send_segments_to_server, args=(segments_queue, stop_event), daemon=True)
     capturing_thread.start()
     sending_thread.start()
 
-    capturing_thread.join()
-    sending_thread.join()
+    # Wait for stop_event to be set by one of the child threads. Reciving stop_event
+    # will also stop all child threads - they are working as a daemons
+    stop_event.wait()
+    print("Stop signal received - ending capturing and sending threads")
 
 
-def send_segments_to_server(segments_queue: Queue):
+def send_segments_to_server(segments_queue: Queue, stop_event: Event):
     def wait_for_connection_with_server(client_socket):
         print(f"Waiting for connection with: {config['server_address']}")
         connected = False
@@ -40,10 +43,18 @@ def send_segments_to_server(segments_queue: Queue):
 
         while True:
             segment = segments_queue.get()
-            if segment == "FINISH":
-                break
             print(f"Sending file: {segment}", end=" ")
-            send_file_to_socket(segment, s)
+
+            try:
+                send_file_to_socket(segment, s)
+            except BrokenPipeError:
+                print()
+                print("Lost connection with the server")
+
+                # Signal to finish the main function and thearfore all started threads (working as daemons) 
+                stop_event.set()
+                return
+
             print("| Completed")
 
         s.shutdown(socket.SHUT_RDWR)
@@ -62,8 +73,7 @@ def wait_for_message(queue: Queue, message):
             break
 
 
-
-def capture_raw_video_segment(segments_queue: Queue):
+def capture_raw_video_segment(segments_queue: Queue, stop_event: Event):
     wait_for_message(segments_queue, "CONNECTION_ESTABLISHED")
     camera = picamera.PiCamera(resolution=(1280, 720))
     segments_queue.put("CAMERA_INITIALIZED")
