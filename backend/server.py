@@ -13,33 +13,48 @@ def start_server():
         with client:
             segment_idx = 0
             while True:
-                segment_file_path = config['video_segments']['path']/f"raw_{segment_idx}.h264"
-                fetch_file_from_socket(client, segment_file_path)
-                segment_idx += 1
+                try:
+                    segment_file_path = config['video_segments']['path']/f"raw_{segment_idx}.h264"
+                    fetch_file_from_socket(client, segment_file_path)
+                    segment_idx += 1
+                    print(f"Received file: {segment_file_path}")
+                except DroppedConnection as e:
+                    print(e)
+                    break
 
             client.shutdown(socket.SHUT_RDWR)
 
 
-def fetch_file_from_socket(client_socket, file_path, chunk_size=8*1024):
+def fetch_file_from_socket(client_socket, file_path):
     """
     Fetches file from tcp socket assuming following data order:
     - first 15 bytes - file size in bytes (header)
     - # of bytes defined in header - actual file data
     """
-    with open(file_path, "wb") as file:
-        file_size_frame = client_socket.recv(15)
-        file_size = int(file_size_frame.decode())
-        remaining_bytes = file_size
-        receiving_file = True
-        while receiving_file:
-            if remaining_bytes > chunk_size:
-                data = client_socket.recv(chunk_size)
-                remaining_bytes -= chunk_size
-            else:
-                data = client_socket.recv(remaining_bytes)
-                receiving_file = False
+    file_size_frame = read_fixed_nbr_of_bytes_from_socket(client_socket, 15)
+    file_size = int(file_size_frame.decode())
+    raw_data = read_fixed_nbr_of_bytes_from_socket(client_socket, file_size)
 
-            file.write(data)
+    with open(file_path, "wb") as file:
+        file.write(raw_data)
+
+
+class DroppedConnection(Exception):
+    pass
+
+
+def read_fixed_nbr_of_bytes_from_socket(client_socket, nbr_of_bytes_to_read):
+    received_bytes = bytearray()
+
+    while len(received_bytes) - nbr_of_bytes_to_read:
+        chunk = client_socket.recv(nbr_of_bytes_to_read - len(received_bytes))
+
+        if chunk == b'':
+            raise DroppedConnection(f"Dropped socked connection with {client_socket.getpeername()}")
+
+        received_bytes.extend(chunk)
+
+    return received_bytes
 
 
 if __name__ == '__main__':
