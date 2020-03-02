@@ -17,7 +17,7 @@ def capture_and_send_segments_to_server():
     capturing_thread.start()
     sending_thread.start()
 
-    # Wait for stop_event to be set by one of the child threads. Reciving stop_event
+    # Wait for stop_event to be set by one of the child threads. Receiving stop_event
     # will also stop all child threads - they are working as a daemons
     stop_event.wait()
     print("Stop signal received - ending capturing and sending threads")
@@ -51,13 +51,13 @@ def send_segments_to_server(segments_queue: Queue, stop_event: Event):
                 print()
                 print("Lost connection with the server")
 
-                # Signal to finish the main function and thearfore all started threads (working as daemons) 
+                # Signal to finish the main function and therefore all started threads (working as daemons)
                 stop_event.set()
                 return
 
             print("| Completed")
 
-        s.shutdown(socket.SHUT_RDWR)
+        # s.shutdown(socket.SHUT_RDWR)
 
 
 def wait_for_message(queue: Queue, message):
@@ -69,7 +69,7 @@ def wait_for_message(queue: Queue, message):
     while True:
         current_message = queue.get()
         if current_message == message:
-            print(f"Recived message: {message}")
+            print(f"Received message: {message}")
             break
 
 
@@ -94,6 +94,8 @@ def capture_raw_video_segment(segments_queue: Queue, stop_event: Event):
         previous_segment_path = next_segment_path
 
     camera.stop_recording()
+
+    stop_event.set()
 
 
 def raw_segment_paths():
