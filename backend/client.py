@@ -6,7 +6,7 @@ from threading import Thread
 
 import picamera
 
-from config import config
+from config import config, project_root
 
 
 def capture_and_send_segments_to_server():
@@ -31,7 +31,7 @@ def send_segments_to_server(segments_queue: Queue):
             except ConnectionRefusedError:
                 sleep(0.5)
 
-        print("Connected to server")
+        print("Connected to server; capturing and sending video segments...")
 
     with socket.socket() as s:
         wait_for_connection_with_server(s)
@@ -42,8 +42,9 @@ def send_segments_to_server(segments_queue: Queue):
             segment = segments_queue.get()
             if segment == "FINISH":
                 break
-
+            print(f"Sending file: {segment}", end=" ")
             send_file_to_socket(segment, s)
+            print("| Completed")
 
         s.shutdown(socket.SHUT_RDWR)
 
@@ -53,10 +54,13 @@ def wait_for_message(queue: Queue, message):
     Waits until given message will appear at the front of the queue.
     This is a blocking operation.
     """
+    print(f"Waiting for message: {message}")
     while True:
         current_message = queue.get()
         if current_message == message:
+            print(f"Recived message: {message}")
             break
+
 
 
 def capture_raw_video_segment(segments_queue: Queue):
@@ -68,12 +72,16 @@ def capture_raw_video_segment(segments_queue: Queue):
     first_segment_path = next(segment_paths)
     camera.start_recording(first_segment_path)
     camera.wait_recording(config['video_segments']['duration'])
-    segments_queue.put(first_segment_path)
 
-    for segment_path in segment_paths:
-        camera.split_recording(segment_path)
+    previous_segment_path = first_segment_path
+
+    for next_segment_path in segment_paths:
+        camera.split_recording(next_segment_path)
+
+        segments_queue.put(previous_segment_path)
+
         camera.wait_recording(config['video_segments']['duration'])
-        segments_queue.put(segment_path)
+        previous_segment_path = next_segment_path
 
     camera.stop_recording()
 
@@ -97,7 +105,7 @@ def send_file_to_socket(file_name, target_socket):
     """
     with open(file_name, "rb") as file_to_send:
         size_frame = f"{get_size(file_to_send):015}"
-        target_socket.send(str.encode(size_frame))
+        target_socket.sendall(str.encode(size_frame))
         target_socket.sendfile(file_to_send)
 
 

@@ -1,8 +1,10 @@
 from pathlib import Path
+import os
 
+
+project_root = os.path.dirname(os.path.abspath(__file__))
 
 config = {
-    'project_root': "",
     'server_address': ("192.168.0.177", 5000),
     'video_segments': {
         'duration': 3,  # in [s]
