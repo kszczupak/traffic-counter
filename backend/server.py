@@ -129,17 +129,6 @@ def web_server(server_queues):
     log = logging.getLogger('werkzeug')
     log.disabled = True
 
-    @app.route('/api', methods=['GET'])
-    def api_hello():
-        data = {
-            'dziubek': 1,
-            'albatros': 'marian'
-        }
-        resp = Response(json.dumps(data), status=200, mimetype='application/json')
-        resp.headers['link'] = 'https://albatros.com'
-
-        return resp
-
     @app.route("/ready_segments_stream")
     def ready_segments_stream():
         """
