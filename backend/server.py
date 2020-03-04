@@ -1,8 +1,12 @@
 import socket
 from lib.utils import ClosableQueue
 from threading import Thread
+from collections import deque
+import logging
+import json
 
 import ffmpeg
+from flask import Flask, Response
 
 from config import config
 
@@ -19,6 +23,11 @@ def main():
         Thread(target=convert_to_mp4, args=(server_queues,)),
         Thread(target=cleanup_files, args=(server_queues,))
     ]
+
+    # Web server thread will be treated differently as other threads
+    # It will be run as daemon - it will be terminated when main function will finish
+    web_server_thread = Thread(target=web_server, args=(server_queues,), daemon=True)
+    web_server_thread.start()
 
     for thread in threads:
         thread.start()
@@ -71,6 +80,7 @@ def fetch_raw_segments(server_queues):
 
 def convert_to_mp4(server_queues):
     segment_idx = 0
+    available_segments = deque()
 
     convert_flags = {
         'c:v': 'copy',  # Copy video codec without re-encoding (it's MUCH faster)
@@ -94,15 +104,67 @@ def convert_to_mp4(server_queues):
         )
 
         server_queues['ready_segments'].put(converted_segment_file)
+        available_segments.append(converted_segment_file)
         print(f"Segment ready: {converted_segment_file}")
         server_queues['files_to_delete'].put(raw_segment)
 
-        segment_idx += 1
+        if len(available_segments) > 10:
+            # keep only 10 mp4 files (segments) to save server space
+            old_segment = available_segments.popleft()
+            server_queues['files_to_delete'].put(old_segment)
+
+        if segment_idx >= 100:
+            segment_idx = 0
+        else:
+            segment_idx += 1
 
 
 def cleanup_files(server_queues):
     for file_to_delete in server_queues['files_to_delete']:
         file_to_delete.unlink()
+
+
+def web_server(server_queues):
+    app = Flask(__name__)
+    log = logging.getLogger('werkzeug')
+    log.disabled = True
+
+    @app.route('/api', methods=['GET'])
+    def api_hello():
+        data = {
+            'dziubek': 1,
+            'albatros': 'marian'
+        }
+        resp = Response(json.dumps(data), status=200, mimetype='application/json')
+        resp.headers['link'] = 'https://albatros.com'
+
+        return resp
+
+    @app.route("/ready_segments_stream")
+    def ready_segments_stream():
+        """
+        Server Send Events (SSE) endpoint for sending video segments which are ready
+        to be played in a browser (using Media Source Extension - MSE)
+        """
+        def event_stream():
+            for ready_segment in server_queues['ready_segments']:
+                data = {
+                    'segment_path': str(ready_segment)
+                }
+
+                yield f"data:{json.dumps(data)}\n\n"
+
+        resp = Response(event_stream(), mimetype="text/event-stream")
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+
+        return resp
+
+    print("Web server started")
+    app.run(
+        host=config['api']['host'],
+        port=config['api']['port'],
+        debug=False
+    )
 
 
 def fetch_file_from_socket(client_socket, file_path):

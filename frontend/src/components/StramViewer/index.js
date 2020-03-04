@@ -6,6 +6,16 @@ class StreamViewer extends Component {
  		super(props);
 
  		this.videoRef = null;
+
+ 		const source = new EventSource("http://192.168.0.177:5001/ready_segments_stream");
+
+ 		source.onopen = () => {
+ 			console.log("Source stream opened");
+ 		};
+
+ 		source.onmessage = event => {
+ 			console.log(event);
+ 		};
  	}
 
 
@@ -29,17 +39,17 @@ class StreamViewer extends Component {
  			const videoSourceBuffer = myMediaSource.addSourceBuffer(mimeCodec);
  			// videoSourceBuffer.mode = 'sequence';
 
-	 		// var chunkUrls = [
-	 		// 	"http://localhost:8085/video/seg_1.mp4",
-	 		// 	"http://localhost:8085/video/seg_2.mp4",
-	 		// 	"http://localhost:8085/video/seg_3.mp4"
-	 		// ];
-
 	 		var chunkUrls = [
-	 			"http://localhost:8085/video/conv.mp4",
-	 			// "http://localhost:8085/video/seg_2.mp4",
-	 			// "http://localhost:8085/video/seg_3.mp4"
+	 			"http://localhost:8085/video/segment_0.mp4",
+	 			"http://localhost:8085/video/segment_1.mp4",
+	 			"http://localhost:8085/video/segment_2.mp4",
+	 			"http://localhost:8085/video/segment_3.mp4",
+	 			"http://localhost:8085/video/segment_4.mp4",
+	 			"http://localhost:8085/video/segment_5.mp4",
+	 			"http://localhost:8085/video/segment_6.mp4",
+	 			"http://localhost:8085/video/segment_7.mp4",
 	 		];
+
 
 
  			videoSourceBuffer.addEventListener('updateend', readNextChunk);

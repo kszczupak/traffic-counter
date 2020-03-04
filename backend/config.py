@@ -9,5 +9,9 @@ config = {
     'video_segments': {
         'duration': 3,  # in [s]
         'path': Path('video/')
+    },
+    'api': {
+        'host': '192.168.0.177',
+        'port': 5001
     }
 }
