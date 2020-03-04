@@ -29,10 +29,16 @@ class StreamViewer extends Component {
  			const videoSourceBuffer = myMediaSource.addSourceBuffer(mimeCodec);
  			// videoSourceBuffer.mode = 'sequence';
 
+	 		// var chunkUrls = [
+	 		// 	"http://localhost:8085/video/seg_1.mp4",
+	 		// 	"http://localhost:8085/video/seg_2.mp4",
+	 		// 	"http://localhost:8085/video/seg_3.mp4"
+	 		// ];
+
 	 		var chunkUrls = [
-	 			"http://localhost:8085/video/seg_1.mp4",
-	 			"http://localhost:8085/video/seg_2.mp4",
-	 			"http://localhost:8085/video/seg_3.mp4"
+	 			"http://localhost:8085/video/conv.mp4",
+	 			// "http://localhost:8085/video/seg_2.mp4",
+	 			// "http://localhost:8085/video/seg_3.mp4"
 	 		];
 
 
