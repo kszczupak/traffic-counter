@@ -1,8 +1,8 @@
 import socket
 from time import time, sleep
 from pathlib import Path
-from queue import Queue
-from threading import Thread, Event
+from lib.utils import ClosableQueue
+from threading import Thread
 
 import picamera
 
@@ -10,20 +10,30 @@ from config import config, project_root
 
 
 def capture_and_send_segments_to_server():
-    segments_queue = Queue()
-    stop_event = Event()
-    capturing_thread = Thread(target=capture_raw_video_segment, args=(segments_queue, stop_event), daemon=True)
-    sending_thread = Thread(target=send_segments_to_server, args=(segments_queue, stop_event), daemon=True)
-    capturing_thread.start()
-    sending_thread.start()
+    segments_queue = ClosableQueue()
 
-    # Wait for stop_event to be set by one of the child threads. Receiving stop_event
-    # will also stop all child threads - they are working as a daemons
-    stop_event.wait()
-    print("Stop signal received - ending capturing and sending threads")
+    threads = [
+        Thread(target=capture_raw_video_segment, args=(segments_queue,)),
+        Thread(target=send_segments_to_server, args=(segments_queue,))
+    ]
+
+    for thread in threads:
+        thread.start()
+
+    # wait for thread completion
+    for thread in threads:
+        try:
+            thread.join()
+        except KeyboardInterrupt:
+            print("User initiated termination, closing all child threads...")
+            # request to close all child threads
+            segments_queue.close()
+            # but continue to wait for all thread to be closed instead of finishing immediately
+
+    print("All child threads finished")
 
 
-def send_segments_to_server(segments_queue: Queue, stop_event: Event):
+def send_segments_to_server(segments_queue: ClosableQueue):
     def wait_for_connection_with_server(client_socket):
         print(f"Waiting for connection with: {config['server_address']}")
         connected = False
@@ -41,8 +51,7 @@ def send_segments_to_server(segments_queue: Queue, stop_event: Event):
         segments_queue.put("CONNECTION_ESTABLISHED")
         wait_for_message(segments_queue, "CAMERA_INITIALIZED")
 
-        while True:
-            segment = segments_queue.get()
+        for segment in segments_queue:
             print(f"Sending file: {segment}", end=" ")
 
             try:
@@ -52,28 +61,30 @@ def send_segments_to_server(segments_queue: Queue, stop_event: Event):
                 print("Lost connection with the server")
 
                 # Signal to finish the main function and therefore all started threads (working as daemons)
-                stop_event.set()
+                segments_queue.close()
                 return
 
             print("| Completed")
 
-        # s.shutdown(socket.SHUT_RDWR)
+        s.shutdown(socket.SHUT_RDWR)
 
 
-def wait_for_message(queue: Queue, message):
+def wait_for_message(queue: ClosableQueue, message):
     """
     Waits until given message will appear at the front of the queue.
     This is a blocking operation.
     """
+    if queue.closed:
+        return
+
     print(f"Waiting for message: {message}")
-    while True:
-        current_message = queue.get()
+    for current_message in queue:
         if current_message == message:
             print(f"Received message: {message}")
             break
 
 
-def capture_raw_video_segment(segments_queue: Queue, stop_event: Event):
+def capture_raw_video_segment(segments_queue: ClosableQueue):
     wait_for_message(segments_queue, "CONNECTION_ESTABLISHED")
     camera = picamera.PiCamera(resolution=(1280, 720))
     segments_queue.put("CAMERA_INITIALIZED")
@@ -88,14 +99,16 @@ def capture_raw_video_segment(segments_queue: Queue, stop_event: Event):
     for next_segment_path in segment_paths:
         camera.split_recording(next_segment_path)
 
+        if segments_queue.closed:
+            # other thread requested to end work
+            break
+
         segments_queue.put(previous_segment_path)
 
         camera.wait_recording(config['video_segments']['duration'])
         previous_segment_path = next_segment_path
 
     camera.stop_recording()
-
-    stop_event.set()
 
 
 def raw_segment_paths():
