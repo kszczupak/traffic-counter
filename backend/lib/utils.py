@@ -1,4 +1,5 @@
 from queue import Queue
+from subprocess import check_output
 
 
 class ClosableQueue(Queue):
@@ -23,3 +24,9 @@ class ClosableQueue(Queue):
                 yield item
             finally:
                 self.task_done()
+
+
+def get_cpu_temperature():
+    temp_str = check_output(["vcgencmd", "measure_temp"]).decode()
+
+    return temp_str[temp_str.find("=") + 1:temp_str.find("'")]

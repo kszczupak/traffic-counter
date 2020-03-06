@@ -1,8 +1,9 @@
 import socket
 from time import time, sleep
 from pathlib import Path
-from lib.utils import ClosableQueue
+from lib.utils import ClosableQueue, get_cpu_temperature
 from threading import Thread
+from subprocess import check_output
 
 import picamera
 
@@ -86,29 +87,30 @@ def wait_for_message(queue: ClosableQueue, message):
 
 def capture_raw_video_segment(segments_queue: ClosableQueue):
     wait_for_message(segments_queue, "CONNECTION_ESTABLISHED")
-    camera = picamera.PiCamera(resolution=(1280, 720))
-    segments_queue.put("CAMERA_INITIALIZED")
 
-    segment_paths = raw_segment_paths()
-    first_segment_path = next(segment_paths)
-    camera.start_recording(first_segment_path)
-    camera.wait_recording(config['video_segments']['duration'])
+    with picamera.PiCamera(resolution=(1280, 720)) as camera:
+        segments_queue.put("CAMERA_INITIALIZED")
 
-    previous_segment_path = first_segment_path
-
-    for next_segment_path in segment_paths:
-        camera.split_recording(next_segment_path)
-
-        if segments_queue.closed:
-            # other thread requested to end work
-            break
-
-        segments_queue.put(previous_segment_path)
-
+        segment_paths = raw_segment_paths()
+        first_segment_path = next(segment_paths)
+        camera.start_recording(first_segment_path)
         camera.wait_recording(config['video_segments']['duration'])
-        previous_segment_path = next_segment_path
 
-    camera.stop_recording()
+        previous_segment_path = first_segment_path
+
+        for next_segment_path in segment_paths:
+            camera.split_recording(next_segment_path)
+
+            if segments_queue.closed:
+                # other thread requested to end work
+                break
+
+            segments_queue.put(previous_segment_path)
+
+            camera.wait_recording(config['video_segments']['duration'])
+            previous_segment_path = next_segment_path
+
+        camera.stop_recording()
 
 
 def raw_segment_paths():
