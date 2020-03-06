@@ -21,6 +21,9 @@ class ClosableQueue(Queue):
                 if item is self.CLOSE_SIGNAL:
                     return
 
+                if self.closed:
+                    return
+
                 yield item
             finally:
                 self.task_done()

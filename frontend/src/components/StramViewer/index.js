@@ -83,7 +83,7 @@ class StreamViewer extends Component {
 	render() {
   		return (
 		    <div>
-		    	<video ref={this.setVideoRef} controls width="800"/>
+		    	<video ref={this.setVideoRef} controls autoPlay width="800"/>
 		    </div>  
   		);
   	}

@@ -120,6 +120,12 @@ def convert_to_mp4(server_queues):
 
 
 def cleanup_files(server_queues):
+    # cleanup old files (video segments) on the startup
+    for file in config['video_segments']['path'].iterdir():
+        if file.suffix in ('.mp4', '.h264'):
+            file.unlink()
+
+    # delete files send by other threads
     for file_to_delete in server_queues['files_to_delete']:
         file_to_delete.unlink()
 
